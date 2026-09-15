@@ -39,6 +39,18 @@ console = Console()
 logger = get_logger(__name__)
 
 
+def _stream_update_status(node_state: object) -> str:
+    """Extract a display status from LangGraph's varying update shapes."""
+    if isinstance(node_state, dict):
+        return str(node_state.get("status", "running"))
+    if isinstance(node_state, tuple):
+        for item in node_state:
+            status = _stream_update_status(item)
+            if status != "running":
+                return status
+    return "running"
+
+
 # ---------------------------------------------------------------------------
 # Session Management
 # ---------------------------------------------------------------------------
@@ -202,7 +214,7 @@ async def execute_pipeline(
         async for event in graph.astream(initial_state, config=config, stream_mode="updates"):
             for node_name, node_state in event.items():
                 if node_name != "__start__":
-                    status = node_state.get('status', 'running')
+                    status = _stream_update_status(node_state)
                     console.print(f"[green]*[/green] {node_name}: {status}")
         
         # Get final state from checkpoint

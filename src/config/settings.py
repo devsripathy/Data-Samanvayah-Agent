@@ -7,8 +7,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # LLM Configuration
-    llm_provider: str = "openai"
-    llm_model: str = "gpt-4o"
+    llm_provider: str = "ollama"
+    llm_model: str = "llama3.2"
+    ollama_base_url: str = "http://localhost:11434"
     openai_api_key: str = ""
     
     # Vector Store / Memory
