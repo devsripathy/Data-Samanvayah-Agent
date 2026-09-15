@@ -11,7 +11,7 @@ The repository contains two ways to use DSA:
 
 - Python 3.10 or newer
 - pip, or [uv](https://docs.astral.sh/uv/)
-- An OpenAI API key for agents that use an OpenAI model
+- [Ollama](https://ollama.com/) for the default local model, or an OpenAI API key when using OpenAI
 
 The included `data/sample.csv` is suitable for verifying the installation. For a real run, provide a CSV or another dataset supported by the configured agents.
 
@@ -58,14 +58,22 @@ python -m pip install -e ".[observability]"
 
 ## Configuration
 
-DSA works with the defaults in `src/core/config.py`. To configure an LLM or optional observability, create a `.env` file in the repository root:
+DSA defaults to a local Ollama model, so no API key is required. Install Ollama, pull a model, and make sure the Ollama service is running:
+
+```powershell
+ollama pull llama3.2
+ollama serve
+```
+
+To configure the local model or switch to OpenAI, create a `.env` file in the repository root:
 
 ```env
-LLM__PROVIDER=openai
-LLM__MODEL=gpt-4o
-LLM__API_KEY=your-openai-api-key
-LLM__TEMPERATURE=0.2
-LLM__MAX_TOKENS=4096
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Use these instead only when LLM_PROVIDER=openai
+# OPENAI_API_KEY=your-openai-api-key
 
 OBSERVABILITY__LANGSMITH_ENABLED=false
 OBSERVABILITY__LANGSMITH_API_KEY=your-langsmith-key
@@ -75,6 +83,8 @@ LOGGING__LEVEL=INFO
 ```
 
 Environment variables use the nested `SECTION__FIELD` format. A `config.yaml` file is also supported for non-secret settings. Do not commit `.env`, API keys, generated checkpoints, or model artifacts.
+
+The current planner uses the configured model to validate the provider and model connection; its sample planning result remains deterministic. The default Ollama path therefore lets the CLI run without a hosted API key.
 
 ## Run the CLI
 
