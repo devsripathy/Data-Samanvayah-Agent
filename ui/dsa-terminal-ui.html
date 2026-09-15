@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DSA // Data Samanvayah Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0805;
+    --glass:#0f0a05;
+    --amber:#ffb000;
+    --amber-dim:#a86f00;
+    --amber-faint:#5c3d00;
+    --amber-glow:#ffe29a;
+    --red:#ff4433;
+    --line:#3d2900;
+    --panel:#160f07;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:#000;
+    font-family:'JetBrains Mono',monospace;
+  }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:28px;
+  }
+  .display{
+    font-family:'VT323',monospace;
+  }
+
+  /* ---------- Monitor housing ---------- */
+  .monitor{
+    position:relative;
+    width:100%; max-width:1180px;
+    background:#050302;
+    border-radius:22px;
+    padding:22px 22px 16px;
+    box-shadow:
+      0 0 0 1px #000,
+      0 30px 60px rgba(0,0,0,.7),
+      inset 0 0 40px rgba(0,0,0,.9);
+  }
+  .monitor-label{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0 6px 10px;
+    font-size:11px; letter-spacing:.12em; color:#5a5248;
+  }
+  .monitor-label .dot{
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    background:var(--amber); margin-right:6px;
+    box-shadow:0 0 6px var(--amber);
+  }
+
+  /* ---------- Screen ---------- */
+  .screen{
+    position:relative;
+    background:radial-gradient(ellipse at 50% 0%, #150e06 0%, var(--bg) 70%);
+    color:var(--amber);
+    border-radius:6px;
+    overflow:hidden;
+    min-height:640px;
+    box-shadow: inset 0 0 120px rgba(0,0,0,.85), inset 0 0 2px #000;
+  }
+  .screen::before{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0px,
+      rgba(0,0,0,0) 1px,
+      rgba(0,0,0,.35) 2px,
+      rgba(0,0,0,.35) 3px
+    );
+    pointer-events:none;
+    z-index:5;
+    animation:flicker 6s infinite;
+  }
+  .screen::after{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
+    pointer-events:none;
+    z-index:6;
+  }
+  @keyframes flicker{
+    0%,100%{opacity:.55;}
+    50%{opacity:.65;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .screen::before{animation:none;}
+  }
+
+  .glow{ text-shadow:0 0 2px currentColor, 0 0 10px rgba(255,176,0,.45); }
+
+  /* ---------- Boot overlay ---------- */
+  #boot{
+    position:absolute; inset:0; z-index:20;
+    padding:36px 40px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px; line-height:1.7;
+    color:var(--amber);
+    background:var(--bg);
+  }
+  #boot .cursor{ display:inline-block; width:8px; height:14px; background:var(--amber); vertical-align:-2px; animation:blink 1s steps(1) infinite;}
+  @keyframes blink{ 50%{opacity:0;} }
+  #boot.hide{ animation:bootOut .5s ease forwards; }
+  @keyframes bootOut{ to{ opacity:0; visibility:hidden; } }
+
+  /* ---------- App shell ---------- */
+  #app{ position:relative; z-index:1; display:flex; flex-direction:column; height:100%; min-height:640px; opacity:0; transition:opacity .4s ease; }
+  #app.ready{ opacity:1; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:1px solid var(--line);
+  }
+  .topbar .brand{ font-family:'VT323',monospace; font-size:24px; letter-spacing:.06em; }
+  .topbar .brand span{ color:var(--amber-dim); }
+  .topbar .mid{ display:flex; gap:22px; font-size:12px; color:var(--amber-dim); }
+  .topbar .mid b{ color:var(--amber); font-weight:500; }
+  .status-pill{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--amber); }
+  .status-pill .led{ width:8px; height:8px; border-radius:50%; background:var(--amber); box-shadow:0 0 6px var(--amber); }
+
+  .body-row{ flex:1; display:flex; min-height:0; }
+
+  /* ---------- Nav ---------- */
+  .nav{
+    width:170px; flex-shrink:0;
+    border-right:1px solid var(--line);
+    padding:16px 0;
+  }
+  .nav-item{
+    display:block; width:100%; text-align:left;
+    padding:9px 20px; font-size:14px; letter-spacing:.03em;
+    background:none; border:none; color:var(--amber-dim);
+    font-family:'JetBrains Mono',monospace; cursor:pointer;
+  }
+  .nav-item:hover{ color:var(--amber); }
+  .nav-item.active{ background:var(--amber); color:#1a0f00; font-weight:700; }
+  .nav-item .k{ opacity:.7; margin-right:8px; }
+  .nav-item.active .k{ opacity:.6; }
+
+  /* ---------- Main ---------- */
+  .main{ flex:1; padding:20px 26px; overflow-y:auto; min-width:0; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .panel-title{ font-family:'VT323',monospace; font-size:20px; letter-spacing:.05em; margin:0 0 4px; }
+  .panel-sub{ font-size:12px; color:var(--amber-dim); margin:0 0 16px; }
+
+  /* generic box */
+  .box{ border:1px solid var(--line); padding:14px 16px; margin-bottom:16px; background:rgba(255,176,0,.02); }
+  .box-head{ font-size:11px; letter-spacing:.1em; color:var(--amber-dim); margin-bottom:10px; }
+
+  /* dataset table (GRiD style) */
+  table.grid{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.grid th{ text-align:left; font-weight:500; color:var(--amber-dim); font-size:11px; letter-spacing:.08em; padding:4px 8px; border-bottom:1px solid var(--line);}
+  table.grid td{ padding:6px 8px; }
+  table.grid tr.row{ cursor:pointer; }
+  table.grid tr.row:hover td{ color:var(--amber-glow); }
+  table.grid tr.row.selected td{ background:var(--amber); color:#1a0f00; }
+
+  .field-row{ display:flex; gap:6px; font-size:13px; padding:3px 0; }
+  .field-row .label{ width:110px; color:var(--amber-dim); flex-shrink:0; }
+
+  .toggle-row{ display:flex; align-items:center; gap:10px; font-size:13px; margin:6px 0; cursor:pointer; user-select:none; }
+  .toggle-box{ width:16px; text-align:center; border:1px solid var(--amber-dim); color:var(--amber); }
+
+  .btn{
+    font-family:'VT323',monospace; font-size:18px; letter-spacing:.04em;
+    background:var(--amber); color:#1a0f00; border:none;
+    padding:9px 22px; cursor:pointer;
+  }
+  .btn:hover{ background:var(--amber-glow); }
+  .btn.ghost{ background:none; border:1px solid var(--amber-dim); color:var(--amber); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+
+  /* pipeline flow */
+  .flow{ display:flex; flex-wrap:wrap; align-items:center; gap:0; margin:18px 0 24px; }
+  .node{
+    border:1px solid var(--amber-dim); padding:12px 14px; min-width:104px;
+    text-align:center; font-size:12px; letter-spacing:.04em; position:relative;
+  }
+  .node .lbl{ font-family:'VT323',monospace; font-size:17px; }
+  .node .st{ margin-top:5px; font-size:10px; letter-spacing:.08em; color:var(--amber-dim); }
+  .node.pending{ opacity:.55; }
+  .node.running{ border-color:var(--amber); background:rgba(255,176,0,.08); animation:pulse 1s infinite; }
+  .node.running .st{ color:var(--amber); }
+  .node.done{ border-color:var(--amber); background:rgba(255,176,0,.03); }
+  .node.done .st{ color:var(--amber); }
+  .node.failed{ border-color:var(--red); }
+  .node.failed .st{ color:var(--red); }
+  @keyframes pulse{ 0%,100%{box-shadow:0 0 0 rgba(255,176,0,0);} 50%{box-shadow:0 0 14px rgba(255,176,0,.5);} }
+  .arrow{ padding:0 6px; color:var(--amber-faint); font-size:16px; }
+
+  /* console */
+  .console{
+    background:#070502; border:1px solid var(--line);
+    height:260px; overflow-y:auto; padding:10px 14px;
+    font-size:12.5px; line-height:1.7;
+  }
+  .console .l{ white-space:pre-wrap; word-break:break-word; }
+  .console .lvl-INFO{ color:var(--amber); }
+  .console .lvl-WARN{ color:var(--amber-glow); }
+  .console .lvl-ERROR{ color:var(--red); }
+  .console .ts{ color:var(--amber-faint); margin-right:8px; }
+  .prompt{ margin-top:8px; font-size:13px; }
+  .prompt .cur{ display:inline-block; width:7px; height:13px; background:var(--amber); vertical-align:-2px; animation:blink 1s steps(1) infinite;}
+
+  /* critic */
+  .verdict{ font-family:'VT323',monospace; font-size:34px; letter-spacing:.05em; }
+  .verdict.pass{ color:var(--amber); }
+  .verdict.fail{ color:var(--red); }
+  .meter{ display:flex; gap:3px; margin:10px 0 4px; }
+  .meter i{ width:14px; height:16px; background:var(--amber-faint); display:inline-block; }
+  .meter i.on{ background:var(--amber); box-shadow:0 0 6px var(--amber); }
+  ul.plain{ margin:6px 0 0; padding-left:18px; font-size:13px; }
+  ul.plain li{ margin-bottom:4px; }
+
+  /* footer */
+  .footer{
+    border-top:1px solid var(--line); padding:9px 20px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:11.5px; color:var(--amber-dim);
+  }
+  .fkeys{ display:flex; gap:16px; }
+  .fkeys b{ color:var(--amber); }
+
+  ::-webkit-scrollbar{ width:9px; }
+  ::-webkit-scrollbar-track{ background:var(--bg); }
+  ::-webkit-scrollbar-thumb{ background:var(--amber-faint); }
+</style>
+</head>
+<body>
+
+<div class="monitor">
+  <div class="monitor-label"><span><span class="dot"></span>GRID-COMPATIBLE TERMINAL // AMBER PHOSPHOR</span><span>MODEL DSA-1987</span></div>
+
+  <div class="screen" id="screen">
+    <div id="boot">
+      <div id="bootLines"></div>
+    </div>
+
+    <div id="app">
+      <div class="topbar">
+        <div class="brand glow">DSA <span>// DATA SAMANVAYAH AGENT</span></div>
+        <div class="mid">
+          <div>SESSION <b id="sessId">a3f9c21d</b></div>
+          <div>THREAD <b id="threadId">thread_ef658b5d</b></div>
+          <div id="clock">--:--:--</div>
+        </div>
+        <div class="status-pill"><span class="led"></span> ONLINE</div>
+      </div>
+
+      <div class="body-row">
+        <div class="nav">
+          <button class="nav-item active" data-view="run"><span class="k">F1</span>NEW RUN</button>
+          <button class="nav-item" data-view="pipeline"><span class="k">F2</span>PIPELINE</button>
+          <button class="nav-item" data-view="sessions"><span class="k">F3</span>SESSIONS</button>
+          <button class="nav-item" data-view="logs"><span class="k">F4</span>LOGS</button>
+          <button class="nav-item" data-view="critic"><span class="k">F5</span>CRITIC</button>
+        </div>
+
+        <div class="main">
+
+          <!-- RUN VIEW -->
+          <div class="view active" id="view-run">
+            <div class="panel-title glow">SELECT DATASET</div>
+            <div class="panel-sub">Choose a file and confirm, or press F2 to watch it run.</div>
+
+            <div class="box">
+              <div class="box-head">/ DATA</div>
+              <table class="grid">
+                <tr><th>NAME</th><th>ROWS</th><th>COLS</th><th>KIND</th><th>MODIFIED</th></tr>
+                <tr class="row selected" data-name="sample.csv" data-rows="10" data-cols="4">
+                  <td>sample.csv</td><td>10</td><td>4</td><td>Tabular / CSV</td><td>14-Sep-26</td>
+                </tr>
+                <tr class="row" data-name="churn_q3.csv" data-rows="4820" data-cols="19">
+                  <td>churn_q3.csv</td><td>4820</td><td>19</td><td>Tabular / CSV</td><td>02-Sep-26</td>
+                </tr>
+                <tr class="row" data-name="sensor_log.parquet" data-rows="118004" data-cols="7">
+                  <td>sensor_log.parquet</td><td>118,004</td><td>7</td><td>Tabular / Parquet</td><td>29-Aug-26</td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="box">
+              <div class="box-head">/ SCHEMA — <span id="schemaName">sample.csv</span></div>
+              <div class="field-row"><div class="label">feature1</div><div>float64 — no missing values</div></div>
+              <div class="field-row"><div class="label">feature2</div><div>int64 — no missing values</div></div>
+              <div class="field-row"><div class="label">feature3</div><div>object — categorical (a / b)</div></div>
+              <div class="field-row"><div class="label">target</div><div>int64 — binary (0 / 1)</div></div>
+            </div>
+
+            <div class="box">
+              <div class="box-head">/ OPTIONS</div>
+              <div class="toggle-row" id="toggleHitl"><span class="toggle-box">X</span> ENABLE HUMAN-IN-THE-LOOP CRITIC REVIEW</div>
+              <div class="toggle-row" id="toggleSqlite"><span class="toggle-box"> </span> PERSIST CHECKPOINTS TO SQLITE</div>
+            </div>
+
+            <button class="btn" id="executeBtn">EXECUTE ▸</button>
+          </div>
+
+          <!-- PIPELINE VIEW -->
+          <div class="view" id="view-pipeline">
+            <div class="panel-title glow">PIPELINE — dataset=sample.csv</div>
+            <div class="panel-sub">memory → quality → supervisor → planner → explorer → trainer → critic → memory_store</div>
+
+            <div class="flow" id="flow"></div>
+
+            <div class="box">
+              <div class="box-head">/ LIVE OUTPUT</div>
+              <div class="console" id="miniConsole"></div>
+            </div>
+          </div>
+
+          <!-- SESSIONS VIEW -->
+          <div class="view" id="view-sessions">
+            <div class="panel-title glow">SESSION HISTORY</div>
+            <div class="panel-sub">Select a session and confirm to inspect, or run &#96;dsa resume &lt;id&gt;&#96; from the CLI.</div>
+            <div class="box">
+              <table class="grid">
+                <tr><th>SESSION</th><th>THREAD</th><th>DATASET</th><th>TIMESTAMP</th><th>STATUS</th></tr>
+                <tr class="row selected"><td>a3f9c21d…</td><td>thread_ef658b5d</td><td>sample.csv</td><td>14-Sep-26 14:14</td><td>DONE</td></tr>
+                <tr class="row"><td>7bb0e5a2…</td><td>thread_9c1a3fd0</td><td>churn_q3.csv</td><td>13-Sep-26 22:02</td><td>AWAITING APPROVAL</td></tr>
+                <tr class="row"><td>04ddccf1…</td><td>thread_11ffbb02</td><td>sensor_log.parquet</td><td>12-Sep-26 09:47</td><td style="color:var(--red)">FAILED</td></tr>
+                <tr class="row"><td>f2118b90…</td><td>thread_55aa0cde</td><td>sample.csv</td><td>10-Sep-26 18:30</td><td>DONE</td></tr>
+              </table>
+            </div>
+            <div class="box">
+              <div class="box-head">/ DETAIL — a3f9c21d…</div>
+              <div class="field-row"><div class="label">Status</div><div>done</div></div>
+              <div class="field-row"><div class="label">Completed</div><div>memory, quality, supervisor, planner, explorer, trainer, critic, memory_store</div></div>
+              <div class="field-row"><div class="label">Errors</div><div>0 entries</div></div>
+              <div class="field-row"><div class="label">Logs</div><div>18 entries</div></div>
+            </div>
+          </div>
+
+          <!-- LOGS VIEW -->
+          <div class="view" id="view-logs">
+            <div class="panel-title glow">LOG STREAM</div>
+            <div class="panel-sub">Full output of the current session.</div>
+            <div class="console" id="fullConsole" style="height:400px;"></div>
+            <div class="prompt">dsa&gt; <span class="cur"></span></div>
+          </div>
+
+          <!-- CRITIC VIEW -->
+          <div class="view" id="view-critic">
+            <div class="panel-title glow">CRITIC EVALUATION</div>
+            <div class="panel-sub">Result of the most recent run.</div>
+            <div class="box">
+              <div class="verdict pass" id="verdictText">— NOT YET RUN —</div>
+              <div class="box-head" style="margin-top:14px;">CONFIDENCE</div>
+              <div class="meter" id="meter"></div>
+              <div id="confidenceLabel" style="font-size:12px;color:var(--amber-dim);">0%</div>
+            </div>
+            <div class="box">
+              <div class="box-head">/ ISSUES FOUND</div>
+              <ul class="plain" id="issuesList"><li>none — run the pipeline first</li></ul>
+            </div>
+            <div class="box">
+              <div class="box-head">/ RECOMMENDATIONS</div>
+              <ul class="plain" id="recsList"><li>—</li></ul>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>Select an item and confirm &nbsp;•&nbsp; Or press F6 for help</div>
+        <div class="fkeys">
+          <span><b>F1</b> Run</span>
+          <span><b>F2</b> Pipeline</span>
+          <span><b>F3</b> Sessions</span>
+          <span><b>F4</b> Logs</span>
+          <span><b>F5</b> Critic</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Boot sequence ----------
+  var bootLines = [
+    "DSA-OS v0.1.0 — GRiD-compatible terminal emulation",
+    "Copyright (c) Data Samanvayah Agent Project",
+    "",
+    "MOUNTING /src/core ................. OK",
+    "MOUNTING /src/agents ................ OK",
+    "  memory  quality  supervisor  planner  explorer  trainer  critic",
+    "LOADING langgraph runtime ........... OK",
+    "CHECKPOINTER: in-memory ............. READY",
+    "",
+    "Type HELP for commands, or select a file and confirm.",
+  ];
+  var bootEl = document.getElementById('bootLines');
+  var appEl = document.getElementById('app');
+  var bootWrap = document.getElementById('boot');
+
+  function finishBoot(){
+    bootWrap.classList.add('hide');
+    appEl.classList.add('ready');
+  }
+
+  if(reduced){
+    bootEl.textContent = bootLines.join('\n');
+    setTimeout(finishBoot, 200);
+  } else {
+    var li = 0;
+    function typeLine(){
+      if(li >= bootLines.length){ setTimeout(finishBoot, 350); return; }
+      var div = document.createElement('div');
+      bootEl.appendChild(div);
+      var text = bootLines[li];
+      var ci = 0;
+      (function typeChar(){
+        div.textContent = text.slice(0, ci) + (ci < text.length ? '' : '');
+        div.innerHTML = text.slice(0, ci).replace(/ /g,'&nbsp;');
+        ci++;
+        if(ci <= text.length){ setTimeout(typeChar, 6); }
+        else { li++; setTimeout(typeLine, text.length ? 60 : 20); }
+      })();
+    }
+    typeLine();
+  }
+
+  // ---------- Clock ----------
+  function tick(){
+    var d = new Date();
+    document.getElementById('clock').textContent = d.toUTCString().slice(17,25) + ' UTC';
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ---------- Nav switching ----------
+  var navItems = document.querySelectorAll('.nav-item');
+  var views = document.querySelectorAll('.view');
+  navItems.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      navItems.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      views.forEach(function(v){ v.classList.remove('active'); });
+      document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    });
+  });
+
+  // ---------- Dataset row select ----------
+  var dsRows = document.querySelectorAll('#view-run table.grid tr.row');
+  dsRows.forEach(function(row){
+    row.addEventListener('click', function(){
+      dsRows.forEach(function(r){ r.classList.remove('selected'); });
+      row.classList.add('selected');
+      document.getElementById('schemaName').textContent = row.dataset.name;
+    });
+  });
+
+  // ---------- Toggles ----------
+  ['toggleHitl','toggleSqlite'].forEach(function(id){
+    var el = document.getElementById(id);
+    el.addEventListener('click', function(){
+      var box = el.querySelector('.toggle-box');
+      box.textContent = box.textContent.trim() === 'X' ? ' ' : 'X';
+    });
+  });
+
+  // ---------- Pipeline nodes ----------
+  var nodeDefs = [
+    {id:'memory', label:'MEMORY'},
+    {id:'quality', label:'QUALITY'},
+    {id:'supervisor', label:'SUPERVISOR'},
+    {id:'planner', label:'PLANNER'},
+    {id:'explorer', label:'EXPLORER'},
+    {id:'trainer', label:'TRAINER'},
+    {id:'critic', label:'CRITIC'},
+    {id:'memory_store', label:'MEMORY STORE'}
+  ];
+  var flowEl = document.getElementById('flow');
+  function renderFlow(){
+    flowEl.innerHTML = '';
+    nodeDefs.forEach(function(n, i){
+      var d = document.createElement('div');
+      d.className = 'node pending';
+      d.id = 'node-' + n.id;
+      d.innerHTML = '<div class="lbl">'+n.label+'</div><div class="st">PENDING</div>';
+      flowEl.appendChild(d);
+      if(i < nodeDefs.length - 1){
+        var a = document.createElement('span');
+        a.className = 'arrow'; a.textContent = '──▶';
+        flowEl.appendChild(a);
+      }
+    });
+  }
+  renderFlow();
+
+  function setNodeState(id, state){
+    var el = document.getElementById('node-' + id);
+    el.className = 'node ' + state;
+    el.querySelector('.st').textContent = state.toUpperCase();
+  }
+
+  var logScript = [
+    ['INFO', 'main', 'Starting DSA execution: session=a3f9c21d, dataset=sample.csv'],
+    ['INFO', 'src.agents.memory.node', 'Memory context retrieved.'],
+    ['INFO', 'src.agents.quality.node', 'Quality checks passed — 0 missing critical fields.'],
+    ['INFO', 'src.agents.supervisor.node', 'Routing to planner.'],
+    ['INFO', 'src.agents.planner.node', 'Selected target column: target (confidence 0.87).'],
+    ['INFO', 'src.agents.explorer.node', 'Generated 12 candidate features.'],
+    ['INFO', 'src.agents.trainer.node', 'Model search complete: best_model=RandomForestClassifier.'],
+    ['INFO', 'src.agents.critic.node', 'Evaluation passed with confidence 0.91.'],
+    ['INFO', 'src.agents.memory.node', 'Episodic run persisted to memory store.'],
+    ['INFO', 'main', 'Pipeline execution completed.']
+  ];
+
+  function appendLog(target, level, source, msg){
+    var line = document.createElement('div');
+    line.className = 'l';
+    var t = new Date();
+    var ts = t.toISOString().slice(11,19);
+    line.innerHTML = '<span class="ts">'+ts+'</span><span class="lvl-'+level+'">'+level+'</span> | '+source+' | '+msg;
+    target.appendChild(line);
+    target.scrollTop = target.scrollHeight;
+  }
+
+  var running = false;
+  function runPipeline(){
+    if(running) return;
+    running = true;
+    document.getElementById('executeBtn').disabled = true;
+    renderFlow();
+    var mini = document.getElementById('miniConsole');
+    var full = document.getElementById('fullConsole');
+    mini.innerHTML = ''; full.innerHTML = '';
+    // switch to pipeline view
+    navItems.forEach(function(b){ b.classList.remove('active'); });
+    document.querySelector('.nav-item[data-view="pipeline"]').classList.add('active');
+    views.forEach(function(v){ v.classList.remove('active'); });
+    document.getElementById('view-pipeline').classList.add('active');
+
+    var order = ['memory','quality','supervisor','planner','explorer','trainer','critic','memory_store'];
+    var li = 0;
+    appendLog(mini,'INFO','main','Pipeline initialized.'); appendLog(full,'INFO','main','Pipeline initialized.');
+
+    function step(i){
+      if(i >= order.length){
+        running = false;
+        document.getElementById('executeBtn').disabled = false;
+        appendLog(mini,'INFO','main','Pipeline execution completed.');
+        appendLog(full,'INFO','main','Pipeline execution completed.');
+        updateCritic(true, 0.91, [], ["Consider increasing dataset size for higher confidence."]);
+        return;
+      }
+      var id = order[i];
+      setNodeState(id,'running');
+      setTimeout(function(){
+        setNodeState(id,'done');
+        var entry = logScript[i+1] || ['INFO','main', id + ' complete.'];
+        appendLog(mini, entry[0], entry[1], entry[2]);
+        appendLog(full, entry[0], entry[1], entry[2]);
+        step(i+1);
+      }, 550);
+    }
+    step(0);
+  }
+  document.getElementById('executeBtn').addEventListener('click', runPipeline);
+
+  // ---------- Critic view ----------
+  function updateCritic(passed, confidence, issues, recs){
+    var v = document.getElementById('verdictText');
+    v.textContent = passed ? '✓ PASSED' : '✗ FAILED';
+    v.className = 'verdict ' + (passed ? 'pass' : 'fail');
+    var meter = document.getElementById('meter');
+    meter.innerHTML = '';
+    var segments = 10;
+    var on = Math.round(confidence * segments);
+    for(var i=0;i<segments;i++){
+      var seg = document.createElement('i');
+      if(i < on) seg.className = 'on';
+      meter.appendChild(seg);
+    }
+    document.getElementById('confidenceLabel').textContent = Math.round(confidence*100) + '%';
+    var issuesList = document.getElementById('issuesList');
+    issuesList.innerHTML = issues.length ? issues.map(function(x){return '<li>'+x+'</li>';}).join('') : '<li>none</li>';
+    var recsList = document.getElementById('recsList');
+    recsList.innerHTML = recs.length ? recs.map(function(x){return '<li>'+x+'</li>';}).join('') : '<li>—</li>';
+  }
+})();
+</script>
+
+</body>
+</html>
